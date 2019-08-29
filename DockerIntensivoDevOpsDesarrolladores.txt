@@ -1,0 +1,165 @@
+
+
+Docker Intensivo para DevOps y Desarrolladores
+
+- Introducción a las tecnologías de virtualización
+- Arquitectura Cliente-Servidor de Docker
+- Instalación de Docker en nuestra máquina
+- Conceptos importantes de Docker
+- Correr nuestro primer container Hello World! en Docker
+- Comandos más útiles para trabajar con Docker 
+- Capas de imagen
+- Docker commit - crear imagenes
+- Docker file
+- Instrucciones del dockerfile
+- Push de imagenes
+
+- Dockerizar una aplicación sencilla
+- Servicio de búsqueda con redis
+- Enlazar contenedores
+- Vinculación de contenedores de manera interna
+- Automatizar el flujo de trabajo con docker-compose
+
+- Pruebas unitarias para probar la aplicación dockerizada
+- Flujo de trabajo con docker, github y CircleCI para crear una pipeline de integración continua
+
+- Ejecutar docker en producción
+- Desplegar nuestra aplicación dockerizada servidor de producción con Digital Ocean
+- Docker swarm, para escalar los flujos de trabajo
+
+
+Código fuente utilizad en GitHub
+- https://github.com/jleetutorial/dockerapp
+
+Grupo de Facebook de Learning DevOps
+https://www.facebook.com/groups/1911219079195863
+
+
+Vitualización basada en contenedores
+- Previrtualización
+    Grandes racks de servidores, cada servidor un sistema operativo y solamente pueden ejecutar un servicio
+    Alto costo ya que se deben adquirir servidores
+    Subutilizando recursos de RAM y CPU
+    Despliegue lento, proceso de compra y configuración puede tomar mucho tiempo para grandes empresas
+    Difíciles de migrar aplicaciones
+    
+Virtualización basada en Hypervisor
+- Servidor físico
+- Sistema Operativo
+- Hypervisor
+- Instalación de varios sistemas operativos
+- Instalación de varias aplicaciones sobre los sistemas operativos
+- VMWare y VirtualBox
+- AWS - Microsoft Azure
+
+Ventajas
+- Más Rentable
+- Propios recursos
+- Pago por potencia de computo y almacenamiento
+- Facil de escalar
+- Reducción del tiempo de semanas en minutos
+
+Limitaciones
+- Duplicación del recurso del kernel, varios sistemas operativos para atender el servicio de aplicaciones
+- Problemas con la portabilidad de la aplicación
+
+Virtualización basada en contenedores
+
+- Servidor físico -máquina física o máquina virtualización
+- Sistema operativo
+- Motor de contenedores
+- Instancia de invitado o contenedor
+- Aplicación con sus respectivas librerías
+- Replicación de kernels, comparten un único kernel, suministra binarios y tiempos de ejecución
+- Virtualización a nivel del sistema operativo
+
+Aislamiento
+- Cómo ejecutar aplicaciones en distintos entornos de ejecución de Java, aislados por contenedores
+- Aislamiento de tiempo de ejecución
+
+Beneficios
+- Más rentable, no crea un SO completo, solamente los componentes necesarios se empaquetan en el contenedor con la aplicación
+- Menor consumo de RAM y CPU
+- Velocidad de implementación aún más rápida
+- Gran portabilidad, ya que cuentan con todo lo necesario para su ejecución dentro del contenedor, se puede ejcutar en todas la máquinas sin problemas de portabilidad
+
+
+Arquitectura cliente-servidor de docker
+- Docker utiliza la arquitectura cliente-sevidor, con el daemon de docker como servidor, el usuario no interactúa directamente con el daemon de docker, sino a través del cliente docker. El cliente de docker es la interfaz principal de comunicación entre el usuario y el servidor
+- Cliente con línea de comandos - Kitematic, cliente gráfico
+- Daemon es un proceso persistente que hace el trabajo pesado como construir, ejecutar y distribuir los contenedores docker, a menudo conocidos como docker dameon, docker engine, ó docker server
+- En una instalación típica de linux, el cliente docker, el daemon docker y el contenedor se ejecutan en el mismo host, también se puede conectar el cliente local de docker, con un servidor remoto de docker.
+- No se puede ejecutar docker de forma nativa en mac, Windows, y en general en platformas que no sean Linux, porque este utiliza funciones específicas del kernel de Linux
+
+Instalación de docker en varios sistemas operativos
+
+$ docker info   # mostrará la información de todo el sistema sobre docker
+
+
+Instalar docker toolbox
+
+Conceptos importantes que hay que entender acerca de la tecnología de docker
+- Las imágenes son plantillas de lectura utilizadas para crear contenedores
+- Las imágenes se crean mediante el comando build de docker, por nosotros y otros usuarios de docker
+- Las imágenes son compuestas de capas de otras imágenes
+- Las imágenes solo se almacenan en un registro de docker
+
+Contenedores
+- Haciendo una analogía con la POO, si una imagen es una clase, entonces un contenedor es una instancia de una clase, un objeto de tiempo de ejecución
+- Los contenedores son livianos y portátiles de un entorno en el cual se pueden ejecutar aplicaciones
+- Los contenedores son creados de imágenes. Dentro de un contenedor, tenemos todos los binarios y dependencias que necesitamos para ejecutar la aplicación
+
+Registros y repositorios
+- Un registro es donde están almacenadas nuestras imágenes
+- Puedes alojar tu propio registro, o puedes usar el registro público de Docker el cual es llamado DockerHub
+- Dentro de un registro, las imágenes se almacenan en repositorios
+- El repositorio de Docker es una colección de diferentes imágenes de docker con el mismo nombre, que tienen etiquetas, cada etiqueta generalmente representa una versión diferente de la imagen
+
+Por qué se utilizan imágenes oficiales?
+- Documentación clara
+- Docker.inc, tiene un equipo dedicado a la revisión del contenido de las imágenes
+- Actualizaciones de seguridad de manera oportuna
+- Repositorios certificados por docker
+
+$ docker images                                 # comando para mostrar las imágenes en el registro local de docker
+$ docker run busybox:1.24 echo "hello world"    # crea un contenedor a partir de una imagen
+$ docker run --rm --name helloworld -d busybox:1.24     # crea un contenedor, que cuando termine la ejecución, se borra, que se llama helloworld, y basado en la imagen busybox:1.24
+$ docker run -ti busybox:1.4                    # crea un nuevo contenedor con ingreso a terminal dentro del contenedor
+
+
+$ docker run -d busybox:1.24 sleep 1000         # crea un contenedor en segundo plano o en background con el modificador -d. Contenedores empezaron en modo detached y salen cuando el proceso raíz usado para ejecutar el contenedor sale
+
+$ docker ps                                     # listar los contenedores que se encuentran actualmente en ejecución
+$ docker ps -acerca                             # listar todos los contenedores, incluso los que ya no están en ejecución
+$ docker run --rm busybox:1.24 sleep 1          # crea un contenedor con el comando sleep de un segundo, para que se mantenga en ejecución por un segundo, y a continuación cuando se detiene, se elimina ya que se le envió el modificador --rm
+$ docker run --name hello_world busybox:1.24    # especifica el nombre hello_world, mediante el modificador --name
+$ docker inspect                                # mostrar la información de bajo nivel sobre un contenedor o imagen
+
+
+Continuación comandos docker
+Docker port mapping
+Docker logs
+
+$ docker run -it --rm -p 8080:8080 tomcat:latest
+$ docker logs {id_contenedor}
+
+Para aprender más sobre el uso de Docker Logging, entra al siguiente enlace:
+
+https://www.level-up.one/deep-dive-into-docker-logging/
+
+Capas de imágenes en docker
+
+Una imagen de docker se compone de una lista de capas de solo lectura, que representan un conjunto de cambios en el sistema de archivos del contenedor, las capas de imágenes se agrupan una encima de otra y crean una última capa en modo escritura para los contenedores. Cada imagen consiste de múltiples capas, y cada capa es solo otra imagen, las imágenes padres son de solo lectura, y encuentra debajo de la capa editable. La imagen que se encuentra en la parte interior, se denomina imagen base. Docker realiza todos los cambios en la capa editable. También se puede saber qué conjunto de imágenes conforman una imagen, ejecutando el comando history de docker:
+
+$ docker history busybox:1.24
+
+Cuando se crea un nuevo contenedor, se crea una nueva capa delgada y en modo escritura encima de la pila existente. A esa capa a menudo se le denomina capa de contenedor editable. Todos los cambios realizados en el contenedor en ejecución, como la escritura de archivos nuevos, la modificación de archivos existentes, y la eliminación de archivos, se escribe en esta capa.
+La principal diferencia entre un contenedor y una imagen, es la capa superior en modo escritura. Todos los cambios en el contenedor, que agregan datos nuevos o  modifican los existentes, se almacenan en esta capa. Cuando se elimina el contenedor, esta capa también se elimina, la imagen subyacente permanece sin cambios ya que cada contenedor tiene su propia capa editable, y todos los cambios se almacenan en ésta. Esto significa que múltiples contenedores, pueden contener el acceso a la misma imagen subyabcente, y tener su propio estado de datos.
+
+1. Todos los cambios realizados en el contenedor en ejecución serán escritos en la capa editable.
+2. Cuando el contenedor es eliminado, la capa editable es también eliminada, pero la imagen subyacente permanece sin cambios.
+3. Múltiples contenedores pueden compartir acceso a la misma imagen subyacente.
+
+
+
+
