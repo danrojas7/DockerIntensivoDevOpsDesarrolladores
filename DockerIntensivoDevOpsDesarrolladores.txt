@@ -161,5 +161,69 @@ La principal diferencia entre un contenedor y una imagen, es la capa superior en
 3. Múltiples contenedores pueden compartir acceso a la misma imagen subyacente.
 
 
+Construir imágenes docker
+
+1. Hacer commit de los cambios realizados en un contenedor
+2. Escribir un Dockerfile
+
+Pasos
+1. Lanzar un contenedor desde una imagen base
+2. Instala el paquete git en el contenedor
+3. Usar docker commit para guardar los cambios realizados en un contenedor
+
+Se crea un nuevo contenedor a partir de la imagen de dockerhub de debian:jessie
+$ docker run -it debian:jessie
+
+Si se requiere una nueva versión de la imagen con el cliente git instalado, se abre una terminal del contenedor, y a continuación se instala con las siguientes instrucciones:
+$ apt-get update && apt-get install -y git
+
+Ahora para guardar la capa de contenedor de docker como una nueva imagen, se utiliza el comando docker commit:
+
+DOcker commit
+- El comando docker commit guardará los cambios que hemos realizado en el sistema de archivos del contenedor docker a una nueva imagen
+
+$ docker commit container_id repository_name:tag
+
+Al realizar commit, se guarda en el reposotorio local de docker
+$ docker commit b54675f35b9b danrojas7/debian:1.0
+
+Ahora se puede crear un nuevo contenedor basado en la nueva imagen de docker que se acabó de construir:
+
+docker run -it danrojas7/debian:1.0
+
+para subir la imagen, se utiliza el siguiente comando:
+
+$ docker login                          # se ingresa el usuario y la contraseña por el prompt
+$ docker push danrojas7/debian:1.0
+
+
+Construcción de imágenes docker mediante archivos docker o dockerfiles
+
+Un Dockerfile es un documento de texto que contiene todas las instrucciones que los usuarios proporcionan para construir una imagen
+
+Una instruccion puede ser la instalación un nuevo programa, agregar un código fuente o especificar un comando que se ejecutará posteriormente de inicializado el contenedor
+
+Docker puede construir imágenes automáticamente leyendo las instrucciones desde un Dockerfile
+- Cada instrucción creará una nueva capa de imagen para la imagen
+- Las instrucciones especifican qué hacer al construir la imagen
+
+Un Dockerfile no debe tener ninguna extensión, para crearlo, se utiliza los siguientes comandos:
+
+$ touch Dockerfile
+$ vim Dockerfile
+
+FROM debian:jessie      # FROM: Para indicar la imagen desde donde se está construyendo
+RUN apt-get update && apt-get install -y git        # RUN: Se utiliza para indicar los comandos que se van a ejecutar, desde una terminal de comandos linux
+RUN apt-get install -y vim
+
+A continuación, para construir la imagen con el Dockerfile recién creado, se ejecuta el siguiente comando:
+
+$ docker build -t danrojas/debian .
+
+De igual manera, el comando docker build, requiere una ruta, que es una ruta a el contexto de compilación de docker
+
+Contexto de compilación de Docker
+- El comando docker build toma la ruta al contexto de compilación como un argumento. La ruta especifica donde encontrar los archivos para el contexto de la compilación en el docker daemon. Por ejemplo si quisiéramos copiar un código fuente del disco local al contenedor, estos archivos deberían encontrarse en la ruta del contexto de compilación. Es de recordar que el docker daemon puede ejecutarse en una máquina remota, y que el Dockerfile no se analizará del lado del cliente. En el proceso de compilación el cliente docker primer empaquetará todos los archivos del contexto de compilación en un tarball, luego transfiere el archivo tarball al Docker Daemon.
+- Por defecto, docker buscará el archivo Dockerfile en la ruta del contexto de compilación. Si el Dockerfile no se encuentra en la ruta del contexto de compilación, se puede decirle a Docker que busque el archivo en la ruta del archivo proporcionado por la opción -f
 
 
