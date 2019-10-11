@@ -7,7 +7,7 @@ Docker Intensivo para DevOps y Desarrolladores
 - Instalación de Docker en nuestra máquina
 - Conceptos importantes de Docker
 - Correr nuestro primer container Hello World! en Docker
-- Comandos más útiles para trabajar con Docker 
+- Comandos más útiles para trabajar con Docker
 - Capas de imagen
 - Docker commit - crear imagenes
 - Docker file
@@ -42,7 +42,7 @@ Vitualización basada en contenedores
     Subutilizando recursos de RAM y CPU
     Despliegue lento, proceso de compra y configuración puede tomar mucho tiempo para grandes empresas
     Difíciles de migrar aplicaciones
-    
+
 Virtualización basada en Hypervisor
 - Servidor físico
 - Sistema Operativo
@@ -224,6 +224,176 @@ De igual manera, el comando docker build, requiere una ruta, que es una ruta a e
 
 Contexto de compilación de Docker
 - El comando docker build toma la ruta al contexto de compilación como un argumento. La ruta especifica donde encontrar los archivos para el contexto de la compilación en el docker daemon. Por ejemplo si quisiéramos copiar un código fuente del disco local al contenedor, estos archivos deberían encontrarse en la ruta del contexto de compilación. Es de recordar que el docker daemon puede ejecutarse en una máquina remota, y que el Dockerfile no se analizará del lado del cliente. En el proceso de compilación el cliente docker primer empaquetará todos los archivos del contexto de compilación en un tarball, luego transfiere el archivo tarball al Docker Daemon.
-- Por defecto, docker buscará el archivo Dockerfile en la ruta del contexto de compilación. Si el Dockerfile no se encuentra en la ruta del contexto de compilación, se puede decirle a Docker que busque el archivo en la ruta del archivo proporcionado por la opción -f
+- Por defecto, docker buscará el archivo Dockerfile en la ruta del contexto de compilación. Si el Dockerfile no se encuentra en la ruta del contexto de compilación, se puede indicarle a Docker que busque el archivo en la ruta del archivo proporcionado por la opción -f
 
+Cuando se inicia el proceso de compilación de la imagen, el proceso de compilación comprende:
+- En pimer lugar muestra el contexto de compilación enviado al docker daemon. El cliente de docker está transfiriendo todos los archivos dentro del contexto de compilación que es el directorio actual desde la máquina local al docker daemon.
+- Docker sigue las instrucciones del Dockerfile, en el paso 2 ejecuta el paso de instalación de los paquetes con el apt-get, se puede ver la id del contenedor, lo que ocurre es que docker inicia un nuevo contenedor, de la imagen base de debian, y a continuación realiza la instalación a partir de los comandos apt-get especificados, estos contenedores se eliminan automáticamente
+- El docker daemon ejecuta cada instrucción dentro de cada contenedor, un contenedor es un proceso editable que escribirá los cambios en el sistema de archivos en una imagen, en el caso particular se instalará un programa. Una vez que docker escrito los cambios en la imagen y la ha guardado, docker eliminará el contenedor. Entonces para cada instrucción, docker creará un nuevo contenedor, ejecuta las instrucciones, agregará una nueva capa a la imágen, y eliminará el contenedor. Básicamente los contenedores son temporales, simplemente se utilizan los contenedores para escribir capas de imágenes, y una vez que se terminan son eliminados. Las imágenes son persistentes y de sólo lectura.
+- Una vez que los pasos se hayan completado, los pasos de la compilación se han ejecutado satisfactoriamente.
+- Cuando no se especifica una etiqueta, la imagen queda con la etiqueta latest
+
+Dockerfile en detalle
+- Cada comando RUN ejecutará el comando en la capa superior editable del contenedor, y luego guardará el contenedor como una nueva imagen.
+- La nueva imagen es usada en el siguiente paso en el Dockerfile. Entonces cada instrucción RUN creará una nueva capa de imagen.
+- Es recomendado enlazar las instrucciones RUN en el Dockerfile para reducir el número de capas de imágenes que son creadas.
+
+
+Dockerfile modificado:
+
+FROM debian:jessie
+RUN apt-get update && \
+    apt-get install -y \
+    git \
+    vim # Se escribe en un solo comando la actualización y la instalación de paquetes para que se procesen en una sola imagen, resultando en una sola capa en lugar de 3
+CMD ["echo", "hello world"]
+
+Ordenar los Argumentos de varias líneas en forma Alfanumérica
+- Esto ayudará a evitar la duplicidad de paquetes, esto ayudará a evitar la duplicación de paquetes, y facilitará la actualización de la lista
+
+
+Instrucción CMD
+- La instrucción CMD especifica qué comando quiere ejecutar cuando el contenedor se inicia
+- Si no se especifica la instrucción CMD en el Dockerfile, docker usará el comando por defecto definido en la imagen base
+- En el caso particular de la imagen debian jessie, el comando predeterminado es bash
+- La instrucción CMD no se ejecuta cuando se construye la imagen, solamente se ejecutará cuando el contenedor se inicie
+- Es posible ejecutar el comando en cualquiera de los formatos exec que se prefiera o en forma de shell
+
+$ docker run --rm danrojas7/debian:2.0
+
+También se puede sobreescribir el comando enviado como segundo argumento el comando a ejecutar
+$ docker run --rm danrojas7/debian:2.0 echo "Hello docker"
+
+
+Docker cache
+- La compilación de los comandos en docker es más rápida que la primera vez, y esto es debido al docker caché
+- Cada vez que Docke ejecuta una instrucción crea una nueva capa de imagen
+- La siguiente vez, si la instrucciónno cambia, Docker simplemente reutilizará la capa existente
+
+Sin embargo, si docker caché se utiliza demasiado, esto puede ocasionar problemas.
+- Por ejemplo se tiene el siguiente Dockerfile:
+FROM ubuntu:14.04
+RUN apt-get update
+RUN apt-get install -y git curl # Se especificará adicional el curl para instalará
+- Docker detecta que las 2 primeras instrucciones no variarán, por lo tanto utilizará para ellas el docker caché
+- Debido a que la actualización no se ejecuta, es posible que se obtenga una versión desactualizada de los paquetes
+
+La solución es enlazar los comandos apt-get update e install, de modo, que siempre que se actualice la instrucción install, siempre traerá la última versión de los paquetes
+
+FROM ubuntu:14.04
+RUN apt-get update && \
+    apt-get install -y \
+    git \
+    curl
+
+También es posible indicarle a docker, que invalide la caché, utlizando el indicador de --no-cache=true
+
+$ docker build --no-cache=true -t danrojas7/debian .
+
+Instrucción COPY
+La instrucción COPY copia nuevos archivos o directorios del contexto de compilación y los agrega al sistema de archivos del contenedor
+
+instrucción ADD
+La diferencia con COPY, es que ADD permite además descargar un archivo de internet y copiarlo en el contenedor
+La instrucción ADD también tiene la capacidad de descomprimir automáticamente los archivos comprimidos
+La regla es: usar COPY a menos que se esté seguro que no se necesite ADD
+
+
+Llevando las imagenes al dockerhub
+Llevar la imágenes docker al repositorio público de dockerhub, para que otros desarrolladores las puedan utilizar. De las imágenes construidas de forma manual con un commit, o con un Dockerhub
+crear una cuenta en Docker Hub https://hub.docker.com
+
+Muestra las imágenes de docker instaladas en el daemon de docker local
+$ docker images
+
+Espeficar etiqueta y tag a una imagen docker
+$ docker tag id_contenedor danrojas7/debian:2.0
+
+$ docker login
+$ docker login --username=danrojas7
+Ingresar usuario y contraseña
+
+Hacer push a la imagen
+$ docker push cuenta_docker_hub/imagen:tag
+$ docker push danrojas7/debian:2.0
+
+Última etiqueta
+- Docker usará la etiqueta predeterminada latest cuando no se proporcione ninguna etiqueta
+- Muchos repositorios usan esto para etiquetar la imagen estable más actualizada, sin embargo esto es aún solo una convención y no es algo obligatorio
+- Las imágenes que son etiquetadas como latest no serán actualizadas automáticamente cuando se envíe una nueva versión de la imagen al repositorio
+- Ignorar la etiqueta latest
+
+
+
+Práctica de Docker
+
+Descargar el proyecto de python desde el repositorio de github:
+https://github.com/jleetutorial/dockerapp.git
+
+Ejecutar el siguiente comando para iniciar sobre la versión del proyecto a trabajar
+$ git checkout branch-v0.1
+
+Dockerfile:
+
+FROM python:3.5
+RUN pip install Flask==0.11.1 redis==2.10.5
+RUN useradd -ms /bin/bash admin                 # Crea un usuario, con la shell definida por defecto
+USER admin                                      # Cambia al usuario creado anteriormente
+COPY app /app                                   # Copia el directorio dentro del contenedor
+WORKDIR /app                                    # Cambia al directorio de trabajo
+CMD ["python", "app.py"]                        # Inicia la aplicación
+
+
+Hacer build de la imagen:
+$ docker build -t jleetutorial/dockerapp:0.1 .
+
+Inicializar un contenedor docker, con la aplicación a partir de la imagen recién construída
+$ docker run -d -p 5000:5000 --name python-dockerapp jleetutorial/dockerapp:0.1
+
+Comando en linux y en Mac, para obtener detalles de la máquina virtual, como la dirección IP sobre la cual está en ejecución
+$ docker-machine ls
+
+Comando para inciar sesión dentro del contenedor:
+$ docker exec -it python-dockerapp bash
+
+Dentro del contenedor, ejecutar el comando siguiente, para comprobar el proceso python con la aplicación en ejecución, y que el contenedor esté en ejecución por el usuario creado en el Dockerfile, y no por el usuario root
+$ ps aux
+
+
+Comando en git para guardar los cambios provisionales, reestableciendo el estado de la rama al estado original, dando la posibilidad de cambiar de rama
+
+$ git stash
+.. Se realizan cambios en otras ramas, y se vuelve a la rama original
+$ git stash list    # muestra los stash guardados
+$ git stash apply   # Se regresa al punto de modificación del repositorio antes de ejecutar git stash
+
+Uso de redis
+- Redis es una estructura de datos de memoria integrada, usando como base de datos, caché y message broker
+- Replicación incorporada y diferentes niveles de persistencia en disco
+- Ampliamente usado en muchos productos críticos en el campo tales como Servicio Timeline de Twitter y Noticias de Facebook
+
+
+Ejecutar la imagen de redis en un contenedor:
+$ docker run -d --name redis redis:3.2.0
+
+Hacer build de la imagen, e iniciar una nueva versión del contenedor:
+$ docker build -t jleetutorial/dockerapp:0.3 .
+$ docker run -d -p 5000:5000 --name python-dockerapp --link redis jleetutorial/dockerapp:0.3
+
+Iniciar sesión en el contenedor
+docker exec -it python-dockerapp bash
+
+Inspeccionar el archivo host, para comprobar la entrada de conexión con el redis
+$ more /etc/hosts
+$ ping redis
+
+Inspeccionar la información de la IP en el contenedor:
+docker inspect python-dockerapp | grep IP
+
+Beneficios de Enlaces entre Contenedores Docker
+- El uso principal de los enlaces entre contenedores docker es que cuando compilamos una aplicación con una arquitectura microservicio, seremos capaces de ejecutar muchos componentes independientes en contenedores diferentes
+- Docker crea un túnel seguro entre los contenedores que no requieren exponer ningún puerto externamente del contenedor
+
+
+Docker compose
 
