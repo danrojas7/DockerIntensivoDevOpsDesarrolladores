@@ -397,3 +397,490 @@ Beneficios de Enlaces entre Contenedores Docker
 
 Docker compose
 
+- La vinculación manual de contenedores y servicios de configuración se convierten impráctivos cuando el número de contenedores crece.
+- Docker compose es una herramienta de docker que permite definir y ejecutar aplicaciones multicontenedor.
+
+$ docker-compose up  # Crea e inicia todos los contenedores
+$ docker ps # verificar funcionamiento
+
+- Docker compose es una herramienta útil para iniciar rápidamente el entorno de Docker.
+- Docker compose usa archivos yml para almacenar la configuración de todos los contenedores, lo cual elimina la carga de mantener nuestros scripts para la organización de docker
+
+Estudio detallado del flujo de trabajo de docker-compose
+
+$ docker-compose up -d
+$ docker-compose ps                 # Mostrar el estado de los contenedores administrados por docker-compose
+$ docker-compose logs               # Opción para mostrar los logs de los contenedores administrados por el docker-compose, que se encuentran en el archivo, diferenciados por colores
+$ docker-compose logs dockerapp     # Mostrar los logs de un contenedor específico
+$ docker-compose stop               # Detener los contenedores sin eliminarlos
+$ docker-compose up                 # Para iniciar los contenedores nuevamente, también se puede hacer mediante el comando docker-compose start
+$ docker-compose rm                 # Eliminar los contenedores, pedirá confirmación para eliminarlos
+$ docker-compose build              # Reconstruye las imágenes de docker del archivo docker-compose que se encuentre activo, esto se hace ya que por defecto docker-compose construye la imagen si la misma no ha sido generada, con este comando se forza a la generación de la imagen
+
+Problemas potenciales que podrías enfrentar cuando trabajes con Contenedores Docker
+https://www.level-up.one/things-watch-working-docker-containers/
+
+Introducción a la Red de contenedores de docker
+
+Modelo de red predeterminado de docker
+- Docker utiliza las capacidades de red del sistema operativo del equipo host para proporcionar soporte de red a los contenedores que se ejecutan en ese equipo
+- Una vez que el daemon de docker es instalado en el equipo host, una interfaz de red docker0, estará disponible en el equipo host, la cual será usada para enlazar el tráfico desde la red externa con la red interna de los contenedores alojados en el equipo host
+- Cada contendor se conecta a la red puente a través de su interfaz de red los contenedores.
+- Los contenedores pueden conectarse entre si y con la red exterior a través de esta interfaz puente, este es el modo en el que se comporta el modo predeterminado de red de docker
+
+Closed Network / None Network
+Bridge Network - Predeterminado
+Host Network
+Overlay Network
+
+verificar las redes de docker
+$ docker network ls
+
+
+
+Tipo de red "Network None"
+- Esta red no tiene acceso al mundo exterior
+- La red none agrega un contenedor a un stack de red de contenedores específico
+- El nuevo contenedor carece de una interfaz de red y estará totalmente aislado, a este tipo de contenedores se denominan un contenedor cerrado
+
+Iniciar un contenedor dentro de la red none
+$ docker run -d --net none busybox sleep 1000
+
+Iniciar sesión dentro del contenedor
+$ docker exec -it eager_hodgkin /bin/ash
+
+Verificar conectividad haciendo un ping a la DNS pública de Google
+$ ping 8.8.8.8
+
+Validar las interfaces de red
+$ ifconfig
+
+En el contenedor de red perteneciente a una red none, no aparecerá ninguna interfaz de red, y solamente existirá una interfaz de redd loopback, no está conectada a ninguna red, y tiene asignada la IP 127.0.0.1, es solamente utilizado por las aplicaciones internas para comunicarse entre sí
+
+- Provee el máximo nivel de protección de red. Ya que los contenedores no se pueden accederse desde una ubicación externa al equipo host que está ejecutando el contenedor dentro de docker
+- Esta conexión no es una buena idea si la red o la conexión a internet es requerida
+- Se adapta bien si el contenedor requiere el máximo nivel de seguridad de red, y cuando el acceso a una red de ordenadores o intenet no es necesario
+
+
+Red Bridge
+
+- Este es el tipo de red predeterminado en contenedores de red docker
+- Todos los contenedores de una red bridge, están conectados entre sí y con el mundo exterior cuando están conectados a la interfaz bridge
+
+verificar las redes de docker, para listar todas las interfaces de red docker en el host local
+$ docker network ls
+
+Apenas se inicialice el daemon de docker, se creará una interfaz predeterminada bridge llamada "bridge". Para verificar los detalles de la red bridge, ejecutando el comando docker network inspect:
+$ docker network inspect bridge
+- Rango predeterminado de la red bridge, es 172.17.0.0 a 172.17.255.255
+
+$ docker run -d --name container_1 busybox sleep 1000
+
+Comprobar las interfaces de red a través del comando siguiente:
+$ docker exec -it container_1 ifconfig
+
+La interfaz de red privada está contectada a la red bridge, y está dentro del intervalo de direcciones IP predeterminado
+
+Ejecutar otro comando de red
+$ docker run -d --name container_2 busybox sleep 1000
+
+Los contenedores pueden usar esta interfaz de red privada para comunicarse entre sí
+$ docker exec -it container_1 ping 172.17.0.3
+
+Y con internet, haciendo un ping al DNS público de Google:
+$ docker exec -it container_1 ping 8.8.8.8
+
+Sin embargo, por defecto, las diferentes redes bridge están aisladas entre sí, los contenedores dentro de una red bridge no pueden acceder a los contenedores dentro de otra red bridge
+
+Crear otra red brigde personalizada:
+
+$ docker network create --driver bridge my_bridge_network
+
+Verificar el rango de IP de la red:
+docker network inspect my_bridge_network
+
+Ejecutar el contenedor 2 desde la nueva red bridge:
+$ docker run -d --name container_3 --net my_bridge_network busybox sleep 1000
+
+Comprobar las interfaces de red a través del comando siguiente:
+$ docker exec -it container_3 ifconfig
+
+Para comprobar si la red bridge están aisladas unas de otras (las redes bridge extán en diferentes redes)
+$ docker exec -it container_3 ping 172.17.0.2
+
+Sin embargo docker tiene una función que nos permite conectar un contenedor docker a otra red, una vez conectado, el contenedor puede comunicarse a con los otros contenedores dentro de la misma red
+$ docker network connect bridge container_3
+
+Comprobar nuevamente las interfaces de red a través del comando siguiente:
+$ docker exec -it container_3 ifconfig
+
+Podemos comprobar que el contenedor tieneU una interfaz de red adicional cuya IP está dentro de rango de IPs de a red bridge
+Esto se comprueba a través de un ping
+
+$ docker exec -it container_3 ping 172.17.0.2
+
+También podemos desconectar el contenedor 3
+$ docker network disconnect bridge container_3
+
+
+Redes Bridge
+- En una red bridge, los contenedores tienen acceso a dos interfaces de red:
+    - Una interfaz de red loopback, que no tiene acceso a la red exterior
+    - Una interfaz privada que está conectada a la red bridge del host, siendo este último el que utiliza para conectarse a la red externa
+- Todos los contenedores en la misma red bridge pueden comunicarse entre sí
+- Por defecto, los contenedores entre diferentes redes bridge no pueden comunicarse entre sí
+- Pero se pueden conectar manualmente uno o varios contenedores a otras redes bridge, y así lograr que se comuniquen
+- El modo bridge es el modelo de red más común en docker
+- Reduce el nivel de aislamiento de la red a favor de una mejor conectividad externa
+- Más adecuada para configurar una red relativamente pequeña en un solo host
+
+
+
+Redes host y overlay
+
+- La red Host es el modo de red menos protegido, agrega un contenedo a el estack de redes del host
+- Contenedores deslegados en el stack del host tiene acceso completo a la interfaz del host
+- Este tipo de contenedores son usualmente conocidos como contenedores abiertos
+
+$ docker run -d --name container_4 --net host busybox sleep 1000
+
+Comprobar las interfaces de red del contenedor a través del comando siguiente:
+$ docker exec -it container_4 ifconfig
+
+El contenedor puede acceder a todo las interfaces de red configuradas en el host
+
+Red Host
+- Mínimo nivel de seguridad de red
+- No es posible aislar en ese tipo de contenedores abiertos, por lo cual se deja el contenedor ampliamente desprotegido
+- Contenedores en ejecución en el stack de redes del host deben tener un mayor nivel de rendimiento comparados con aquello ejecutándose en asignaciones de puerto docker0, bridge e iptables
+
+
+Red Overlay
+- Todos los modelos vistos hasta el momento, tienen la limitación de ejecutarse en una sola máquina host
+- Por lo tanto el modo de red Overlay soporta múltiples máquinas host
+- Requiere algunas condiciones preexistentes antes de que sean creadas
+    - Ejecutar el docker engine en modo Swarm
+    - Un servicio de almacenamiento clave valor válido
+    - Es una red ampliamente usada en producción
+    - Es una red utilizada en la implementación de varios host a través de Docker Swarm
+
+https://docker-docker.com/engine/userguide/networking/overlay-standalone-swarm/#create-a-swarm-cluster
+
+
+Definir modelos de Red a través de Docker Compose
+
+Por defecto, docker compose configura un tipo de red predeterminada a la cual los contenedores se unirán, y también sera accesible a contenedores de esa red.
+
+Para verificar que los contenedores al momento de crearse, se agregan en una red por defecto con driver bridge
+$ docker network ls
+
+
+Se pueden también definir topologías de red más complejas, en las que se pueden definir aislamiento de red entre servicios, estos tipos de aislamiento de red son muy populares entre aplicaciones de varios niveles:
+
+version: '2'
+services:
+  proxy:
+    build: ./proxy
+    networks:
+      - front
+  app:
+    build: ./app
+    networks:
+      - front
+      - back
+  db:
+    image: postgres
+    networks:
+      - back
+networks:
+  front:
+    driver: custom-driver-1
+  back:
+    driver: custom-driver-2
+    driver_opts:
+      foo: "1"
+      bar: "2"
+
+
+Escribir pruebas unitarias entre contenedores:
+Pruebas unitarias para la aplicación, y cómo ejecutarlas dentro de un contenedor
+- Las pruebas unitarias testean algunas funcionalidades básicas de nuestro código docker app, sin depender de servicios externos
+- Las pruebas unitarias deberán ejecutarse tan rápido como sea posible para que los desarrolladores puedan iterar más rápido sin esperar demasiado por los resultados
+- Los contenedores DOcker se pueden crear en segundos, facilitando la creación de un entorno limpio y aislado siendo una gran herramienta para ejecutar pruebas unitarias
+
+Se utiliza un framework de pruebas unitarias llamado unitest
+
+Se utiliza un comando especial de docker-compose, para ejecutar un comando que esté presente dentro de un servicio de un contenedor
+$ docker-compose run dockerapp python test.py
+
+Incorporando pruebas unitarias
+Ventajas
+- Una sola imagen se utilizará para desarrollo, entorno de pruebas y producción, lo cual garantiza la confabilidad de nuestras pruebas.
+Desventajas
+- Incrementa el tamaño de la imagen
+
+
+
+Adaptar la tecnología de  Docker en el Proceso de Integración Continua (CI)
+
+¿Qué es integración continua?
+
+- la integración continua es una práctica de ingeniería de software en la que los cambios aislados se prueban y se informan inmediatamente cuando estos cambios son añadidos a un código base más grande
+- El objetivo de la Integración Continua es proprocionar retroalimentación rápida de modo que si se introduce un defecto al código base, este será identificado y corregido tan pronto como sea posible
+
+URL de la cuenta Github para hacer fork:
+
+https://github.com/jleetutorial/dockerapp
+
+
+Chequeo para keys SSH existentes:
+
+https://help.github.com/articles/checking-for-existing-ssh-keys/
+
+
+Genera una nueva key SSH y agrégala al agente ssh:
+
+https://help.github.com/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent/
+
+
+Agrega una nueva key SSH a tu cuenta GitHub:
+https://help.github.com/articles/adding-a-new-ssh-key-to-your-github-account/
+
+
+Introducción a Ejecución de Docker en producción
+
+Opiniones acerca de Ejecutar Docker en producción
+- Por un lado, muchos usuarios de Docker confían en que una app web distribuida se puede implementar a escala utilizando Docker, por lo que han incorporado docker en producción.
+- Por otro lado, hay algunos usuarios que dudan en usar docker en producción ya que piensan que el flujo de trabajo de docker es muy complicado o inestable al tratar de aplicarlo en proyectos
+
+¿Docker está listo para usarse en producción?
+
+Preocupaciones acerca de Ejecutar Docker en producción
+- Se necesitan aclarar como Docker aborda temas tales como la persistencia de datos, redes, seguridad y gestión de identidad
+- El ecosistema de soporte de aplicaciones dockerizadas en producción tales como herramientas de monitoreo y registro todavía no están listas
+
+Compañías que están usando Docker usando Docker en Producción:
+- Spotify
+- yelp
+
+¿Por qué ejecutar contenedores docker dentro de máquinas virtuales?
+- Para considerar problemas de seguridad
+- Aislamiento a nivel de hardware
+
+Todos ellos ejecutan contenedores dentro de máquinas virtuales:
+- Google Contain Engine
+- Amazon S2 container services
+
+Docker Machine
+- Configurar nuevas máquinas virtuales
+- Instalar máquinas docker en ellas
+- Vincular el cliente docker con las máquinas docker remotas
+
+Controladores de Docker Machine
+- AWS
+- DigitalOcean
+- VirtualBox
+- Google App Engine
+
+
+Registra tu cuenta en DigitalOcean para Desplegar Aplicaciones en Contenedores
+
+
+Crear cuenta en Digital Ocean
+- Crear una cuenta en Digital Ocean, o autenticarse con la cuenta de GitHub
+- Inscribir tarjeta de crédito
+- Canjear un cupón de pago gratuito, para utilizar la máquina virtual más básica para montar los contenedores en la nube pública
+
+Instalar Docker-machine, en windows o en Mac
+Docker Machine proporciona drivers para conexión a los servicios de nube más populares como Amazon AWS, y Microsoft Azure, en este caso se va a utilizar el proveedor de Digital Ocean
+
+Comando para especificar el token de conexión a la cuenta de Digital Ocean
+$ docker-machine create --driver digitalocean --digital-access-token
+
+Comando para aprovisionar la máquina virtual de DigitalOcean, especificando la máquina virtual con el docker engine preinstalado, como también los certificados
+$ docker-app-machine
+
+Mostrar los comandos necesarios para configurar el entorno del cliente docker, para que se pueda conectar a la máquina virtual que se acabó de aprovisionar
+$ docker-machine env docker-app-machine
+
+Se modifica el archivo docker-compose.yml, y se renombra como prod.yml, en el cual se modifica la instrucción build, por la instrucción de image, esto es para traer la imagen que se encuentra en dockerhub y que fue construida a través de CircleCI
+
+Una ve modificado se ejecuta el siguiente comando:
+$ docker-compose -f prod-yml up -d
+
+Esto desplegará todos los archivos definidos en el archivo de docker-compose
+
+Mostrar todas las máquinas virtuales:
+$ docker-machine ls
+
+
+Comando Docker Machine Create
+$ docker-machine create --driver digitalocean --digitalocean-access-token <XXXX> docker-app-machine
+
+Introducción a Docker Swarm y Configurar un Clúster Swarm
+
+Qué sucedería si existe un sistema complicado de muchos contenedores, y que los mismos no puedan soportarse en un solo servidor?
+
+- Docker Swarm es una herramienta que agrupa muchos Docker engine y programa contenedores
+- Docker Swarm decide qué host ejecuta el contenedor en función de los métodos de planificación
+
+Por un lado se tiene los docker host cada uno con los docker deamon que se ejecutan en cada uno de los host. También se configura docker swarm, que es el administrador de clústeres de docker, entre el cliente docker y los hots. El administrador Swarm estárá conectado todos y cada uno de los docker daemon, con lo cual tendrá el estado de los docker deamon de cada uno de los nodos del clúster. Cuando se va a ejecutar un servicio, el administrador Swarm decidirá donde ejecutar el servicio, solamente se tiene que direccionar el cliente docker al administrador Swarm, en lugar de hacerlo en todos y cada uno de los docker deamons. Básicamente Docker Swarm puede agrupar varios host en un clúster, y distribuir contenedores docker en estos host. Por lo que las cargas de trabajo se repartirán en los nodos dentro del Swarm, y esto es sabido por los usuarios finales. De esta manera, Docker Swarm se encarga de las tareas de planificación manual, desde el cliente al administrador Swarm. También es posible direccionar varios clientes docker al mismo administrador Swarm, de modo de varios usuarios puedan compartir el mismo clúster Swarm. Existen tres conceptos importantes en Docker Swarm:
+
+- Nodo: Una instancia del docker engine que participa en el Swarm, se puede ejecutar uno o más nodos en una sola computadora o en un servidor en la nube. La producción de despliegues a Swarm suele incluir nodos docker distribuídos en múltiples máquinas distribuídas y en la nube
+- Nodo Administrador:
+- Nodo de trabajo:
+
+
+Cómo trabaja un Clúster Swarm
+
+- Para desplegar nuestra aplicación a Swarm, se debe enviar el servicio a un nodo administrador
+- El nodo administrador despacha unidades de trabajo llamadas tareas a los nodos de trabajo
+- Los nodos administradores también realizan las funciones de orquestación y gestión de clústeres necesarias para mantener el estado deseados del swarm. Los nodos administradores eligen una única unidad para llevar a cabo tareas de orquestación
+- Los nodos de trabajo reciben y ejecutan tareas enviadas desde los nodos administradores. Por defecto, los nodos administradores también ejecutan servicios como nodos de trabajo, pero se pueden configurar para ejecutar exclusivamente tareas de administrador y funcionar únicamente como nodos administradores.
+- Un agente se ejecuta en cada nodo de trabajo e informa de las tareas asignadas a este. El nodo de trabajo notifica al nodo administrador del estado actual de las tareas asignadas de modo que el administrador mantendrá el estado deseado de cada nodo de trabajo
+
+Configurar un clúster swarm
+
+- Paso 1: Crea dos máquinas virtuales, una será usada para el nodo administrador de swarm, y el otro será usado para el nodo de trabajo
+- Paso 2: Nombra la primer máquina virtual como un administrador de Swarm e iniica un clúster swarm
+    - docker swarm init
+- Paso 3: Deja que la segunda máquina virtual se una al clúster swarm como un nodo de trabajo
+    - docker swarm join
+        Inicializa el swarm. El docker engine modificado por este comando se convertirá en un nodo administrador en el swarm de un solo nodo recientemente creado.
+    - docker swarm join --token SWMTKN-1-3atc7surkl3wsvy0r07zt1xar1m1ecja46lwcsajjflxkgplk4-1bh5ukwpx30mhdc7mxo2tyaxz 192.168.1.9:2377
+        Agrega la seguna máquina virtual al clúster swarm como si fuera un nodo de trabajo
+    - docker swarm leave
+        Desconecta el nodo del cluster swarm
+
+
+Servicios en Docker
+- Los servicios pueden ser definidos en nuestro archivo Docker compose
+- La definición del servicio incluye qué imagenes de Docker se ejecutarán, la asignación de puerto y la dependencia entre servicios
+- Cuando se despliegan servicios en modo swarm, también existe otra configuración muy importante que se refiere a la llave deploy y solo está disponible en formatos de archivos Docker compose versión 3.0 y posteriores
+
+version "3.0"
+services:
+    dockerapp:
+        image: jleetutorial/dockerapp
+    ports:
+        - "5000:5000"
+    depends_on:
+        - redis
+    deploy:                 # La llave deploy, y sus subopciones se pueden usa para equilibrar la carga y optimizar el rendimiento de cada servicio
+        replicas: 2
+    redis:
+        image: redis:3.2.0
+
+Observar el siguiente archivo docker-compose.yml
+
+
+version: "3.3"
+services:
+    nginx:
+        image: nginx:latest
+    ports:
+        - "80:80"
+    deploy:
+        replicas: 3         # docker ejecutará 3 instancias de la imagen nginx
+        resources:
+            limits:
+                cpus: '0.1'
+                memory: 50M
+        restart_policy:
+            condition: on_failure
+
+Qué es una réplica?
+
+Cuando se despliega el servicio nginx a swarm, el administrador swarm acepta la definición del servicio como el etsado deseado del servicio, luego swarm planifica la ejecución del servicio nginx en 3 nodos que pertenecen al clúster swarm, cada nodo ejecutará un contenedor nginx, y estos se llaman réplicas. Por qué se busca ejecutar los contenedores en varios host?
+Esto se hace para lograr escalabilidad y alta disponitiblidad. Lo que significa que la aplicación podrá escalar si el número de usuarios se incrementa, y la aplicación permanecerá en línea si uno de los contenedores falla.
+
+
+Es posible preguntarse si es posible acceder a cualquier contenedor nginx desde cualquiera de los 3 host? la respuesta es que si es posible, en el archivo de docker-compose.yml, se le está indicando a docker que publique el puerto 80 como un puerto disponible para el servicio nginx. Cuando docker publica un puerto para un servicio, lo hace asignando ese puerto a todos los nodos dentro del clúster swarm, cuando el tráfico llega a ese puerto, ese tráfico se enruta a un contenedor ejecutándose en ese servicio, por lo que es posible acceder s nginx visitando el puerto 80 en cualquiera de los tres host. Este concepto es bastante estándar cuando todos los nodos están ejecutando un contenedor de servicio. Sin embargo es bastante interesante cuando se tienen más nodos que réplicas.
+
+Por ejemplo se tienen 4 nodos en el clúster swarm, y swarm desplegó únicamente 3 réplicas del servicio nginx. Qué pasaría si llega una petición al nodo swarm que no tiene una rélica en ejecución del contenedor de nginx? La respuesta es que aún sería posible de conectar al servicio nginx a través de un nodo que no tiene una réplica del servicio nginx.
+Esto se denomina en docker como equilibrio de ingreso de carga
+    - Todos los nodos de trabajo estarán pendientes para conectar puertos de servicio
+    - Cuando el servicio es llamado por sistemnas externos, el nodo receptor aceptará ese tráfico, e internamente equilibrará la carga utilizando un servicio interno de DNS que el servicio de Docker mantiene
+Por lo que es posible que si se escala a 100 nodos de trabajo, los usuarios finales de nuestro servicio nginx podrán conectarse sin problemas a cualquier nodo de trabajo, luego serán redirigidos a cualquiera de los host que estén ejecutando el contenedor, y luego van a ser redirigidos a cualquiera de los host que estén ejecutando los contenedores. Todo el redireccionamiento y balanceo de carga es transparente al usuario final.
+
+Además de las réplicas, es posible configurar aspectos como  por ejemplo limitar a las réplicas a usar como máximo el 10% de la CPU en todos los microprocesadores, y 50MB de ram. es posible incluso solicitar a docker que reinicie los contenedores inmediatamente en caso uno de ellos falle, en garantizar que el servicio se encuentre siempre en línea. Mediante todo este proceso docker tiene como objetivo principal proporcionar escalabilidad de compilación, y un soporte de alta disponibilidad para el servicio desplegado en un clúster docker swarm
+
+Antes de poder desplegar el servicio en docker swarm, existe otro concepto en swarm: Docker Stack
+
+Docker Stack
+Este es un concepto reciente de Docker.
+- Un docker stack es un grupo de servicios interrelacionados que comparten dependencias, y se pueden organizar y escalar juntos
+- Se puede imaginar un stack como una colección activa de todos los servicios definidos en el archivo de Docker Compose:
+    - docker stack deploy
+- En el modo Swarm:
+    - Se pueden reutilizar todos los comandos de Docker Compose para la definición de los servicios.
+    - Los comandos Docker Compose no pueden ser reutilzados. Los comandos docker compose solo se pueden programar en contenedores de un solo nodo.
+        docker-compose up
+        docker- compose down
+- En el modo swarm, se tendrá que utilizar docker stack
+- Se puede pensar en docker stack, como un docker compose para el docker swarm
+
+Inicializar el docker stack en el clúster swarm:
+ $ docker stack deploy --compose-file prod.yml dockerapp_stack
+
+Comprobar el estado del stack:
+ $ docker stack ps dockerapp_stack
+
+Mostrar los nodos de docker en modo swarm:
+ $ docker node list
+
+Al momento de crear el stack, docker automáticamente crea una red overlay llamada dockerapp_stack_default para comunicación cruzada de nodos. Por lo general no es necesario personalizar la configuración de la red en docker stack. Entonces docker creará los servicios dockerapp y redis. También se puede enumerar todos los stack en el cluster swarm, con el comando
+
+Listar los stacks que se encuentran instanciados en el docker swarm
+$ docker stack ls
+
+Listar los servicios en docker stack
+$ docker stack services dockerapp_stack
+
+
+Que hay de nuevo en Docker 17.06
+
+Docker 17.06
+
+Docker 17.06 (stable) fue lanzado en Junio del 2017!  Docker avanza muy rapido, con un canal de borde lanzado cada mes y una lanzamiento estable cada 3 meses
+
+Mira un video de Mango dando un resumen de las nuevas características en la comunidad de edición Docker 17.06.
+
+Para una lista detallada de cambios, mira a través de las notas lanzadas por Docker CE en GitHub.
+
+
+Soporte Nativo de Docker para Kubernetes
+
+En el DockerCon 2017, llevado a cabo en Copenhague, Docker anunció que estará agregando soporte para ejecutar aplicaciones usando el orquestador de Docker Swarm con Kubernetes en el mismo clúster de computadoras.
+
+Kubernetes es una plataforma de orquestación de contenedores que no cubrimos mucho en este curso (¡Pronto tendremos un curso sobre Kubernetes!). Kubernetes es una alternativa a Docker Swarm, pero a comparación de Docker Swarm, Kubernetes está más preparado para producción.
+
+¡Ésta es una gran noticia! ¡La introducción del soporte nativo de Docker para Kubernetes nos da la posibilidad de elegir una orquestación con características propias de Docker tales como: seguridad adicional, administración y la experiencia de principio a fin de Docker, que hemos esperado durante tanto tiempo!
+
+
+
+Texto de soporte: Aprendizaje Futuro
+
+    Obtén una copia GRATIS de nuestro Libro DevOps
+
+https://www.level-up.one/devops-pdf-book/
+
+    Únete a nuestro grupo de Facebook para DevOps
+
+https://www.facebook.com/groups/1911219079195863/
+
+
+Clase Extra: Cupones para Otros de Nuestros Cursos
+
+Nos complace ofrecérles un cupón de descuento de $15 a nuestros estudiantes para todos nuestros cursos en Udemy.
+
+Domina Jenkins CI para DevOps y Desarrolladores ($15,  Udemy Best Seller en Categoria Jenkins)
+https://www.udemy.com/domina-jenkins-ci-para-devops-y-desarrolladores/?couponCode=EXISTING_STUDENT
+
+IntelliJ IDEA Tricks to Boost Productivity for Java Devs ($15)
+https://www.udemy.com/intellij-idea-secrets-double-your-coding-speed-in-2-hours/?couponCode=DOCKER_STUDENT_15
+
+Apache Spark with Java - Mastering Big Data! ($15, Udemy Best Seller in Apache Spark Category)
+https://www.udemy.com/apache-spark-course-with-java/?couponCode=DOCKER_STUDENT_15
+
+
